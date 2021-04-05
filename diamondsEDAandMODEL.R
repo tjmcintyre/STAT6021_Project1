@@ -15,6 +15,7 @@ levels(diamonds$clarity)
 levels(diamonds$cut)
 levels(diamonds$color)
 
+#counts and summary stats of variables
 count(diamonds,c(cut))
 count(diamonds,c(clarity))
 count(diamonds,c(color))
@@ -22,6 +23,7 @@ count(diamonds,c(color))
 summary(diamonds$price)
 summary(diamonds$carat)
 
+#basic view of price vs carat
 model = lm(price~carat, data = diamonds)
 par(mfrow = c(1,1))
 plot(model, main = "Price~Carat")
@@ -111,6 +113,8 @@ legend("topleft",
        pch=c(1,2,3,4,5,6,7,8), 
        col=c("black","red","blue", 'green', 'orange', 'purple', 'gray','pink')) 
 
+
+############################## color plot ##############################################
 unique(diamonds$color)
 
 c1=subset(diamonds, color == 'G')
@@ -152,14 +156,17 @@ legend("topleft",
        pch=c(1,2,3,4,5,6,7), 
        col=c("black","red","blue", 'green', 'orange', 'purple', 'gray')) 
 
+#box cox is close to 0 so we will use a log transformation for ease of interpretation
 par(mfrow = c(1,1))
-boxcox(model, seq(-.1,.4, by=.1), main = "Box-Cox Plot of Price~Carat")
+boxcox(model, seq(-.1,.4, by=.1), main = "Box-Cox Plot of Price~Carat") 
 
+#out put is still not solving the constant variance so we add a transformation to the predictor
 model2 = lm(log(price)~carat, data =diamonds)
 boxcox(model2, seq(-5,5, by =1))
 par(mfrow = c(2,2))
 plot(model2, main = 'log(price)~carat')
 
+#output now looks like it will pass linear regresion assumptions, we will check ACF and boxcox after adding categoricals
 model3 = lm(log(price)~log(carat+.1), data=diamonds)
 par(mfrow=c(2,2))                                                              
 plot(model3, main = 'log(price)~log(carat + 0.1)')
@@ -169,16 +176,12 @@ plot(model3, main = 'log(price)~log(carat + 0.1)')
 
 ############################## Quantitatives have now been transformed #################################3
 diamonds$price = log(diamonds$price)
-diamonds$carat = log(diamonds$carat + .1)
-
-model4 = lm(diamonds$price~diamonds$carat)
-boxcox(model4, seq(-2,2, by =.2))
-par(mfrow=c(1,2))
-plot(model4)
-acf(model4$residuals, main ="ACF Plot of Model Residuals")
+diamonds$carat = log(diamonds$carat +0.1)
 
 
 ################################Used these to decide groupings to follow#################################3
+
+########################color plot transformed quantitatives ############################################
 par(mfrow=c(1,1))
 c1=subset(diamonds, color == 'G')
 c2=subset(diamonds, color == 'H')
@@ -218,8 +221,9 @@ legend("topleft",
        lty=c(1,2,3,4,5,6,7),
        pch=c(1,2,3,4,5,6,7), 
        col=c("black","red","blue", 'green', 'orange', 'purple', 'gray')) 
+################################### We used this plot to determine color groupings further down ###################33
 
-
+###################################cut plot after transformation##########################################
 par(mfrow=c(1,1))
 
 a1=subset(diamonds, cut == "Very Good")
@@ -249,9 +253,9 @@ abline(reg4,lty=4, col='green')
 
 legend("topleft", c("Very Good","Good","Ideal", 'Astor Ideal'), lty=c(1,2,3,4), pch=c(1,2,3,4), col=c("black","red","blue", 'green')) 
 
+#we used this plot to make the cut groupings further down in the code
 
-unique(diamonds$clarity)
-
+################################### clarity plot post transformation #######################################3
 b1=subset(diamonds, clarity == 'VVS2')
 b2=subset(diamonds, clarity == 'VS2')
 b3=subset(diamonds, clarity == 'IF')
@@ -294,7 +298,9 @@ legend("topleft",
        pch=c(1,2,3,4,5,6,7,8), 
        col=c("black","red","blue", 'green', 'orange', 'purple', 'gray','pink')) 
 
+############################we used this plot to relevel the levels of clarity below ########################3
 
+################################ Setting new levels for categoricals ##########################################
 levels(diamonds$color) <- list("colorgroup1" = c("D"),
                                "colorgroup2"   = c("E","F","G","H"),
                                "colorgroup3"   = c("I","J"))
@@ -384,7 +390,7 @@ step(small, scope=list(lower=small, upper=full_no_int), direction="forward")
 step(full_no_int, scope=list(lower=small, upper=full_no_int), direction="backward")
 
 #Both ways consider having all 3 variables based on aic however clarity is most important followed by color by cut in that order
-#based on lowest aics so lets do that based on partial F-tests as well
+#based on lowest aics 
 
 model_select = lm(price~carat + clarity+color+cut, data = diamonds)
 summary(model_select)
@@ -394,6 +400,8 @@ summary(full_int) #some not very siginifcant interactions here
 
 anova(model_select, full_int) #### F test suggest keeping the interactions, however with the parallel nature we decided to remove them
 
+
+##################### Since our previous plots show similar slopes we decided to ignore interactions #################
 summary(model_select)
 par(mfrow=c(2,2))
 plot(model_select, main = "Selected Model")
@@ -409,3 +417,4 @@ pairwise_clar<-glht(full_no_int, linfct = mcp(clarity="Tukey"))
 summary(pairwise_clar)
 summary(pairwise_col)
 summary(pairwise_cut)
+
