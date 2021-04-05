@@ -1,11 +1,22 @@
 ---
-title: "R Notebook"
-output: html_notebook
+title: "Stats Diamonds Project Notebook"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
 ---
-Read in original data and new brand data
-Then combine into single dataframe "diamonds" (matching TJ's naming)
-Which now has a new column "vendor"
-Original data file has value "vendor" == "Original"
+8:15 Wednesday section, Group 6
+Manpreet, Tulsi, TJ, Jonathan
+
+This code's purpose is to focus on external data sources for 
+diamond pricing, to see if they are compatible with the project dataset and the model we have developed.
+
+The code will:
+Read in original data plus external brand data
+Then combine into single dataframe "diamonds" 
+Add a new column "vendor"
+The original data has value "vendor" == "Original"
 
 ```{r}
 orig_diamonds= read.csv("diamonds4.csv")
@@ -17,14 +28,19 @@ extra_diamonds = data.frame(extra_diamonds)
 keep_columns = c("carat","clarity","color","cut","price","vendor")
 extra_diamonds = extra_diamonds[keep_columns]
 
+# Merge the external data and original 
+# So that transformations occur in the same way to both types
 diamonds <- rbind(extra_diamonds, orig_diamonds)
 
 # preserve original values for price and carat, pre-transform
+# So that we can continue to refer to them in terms that
+# make sense to the customer
 diamonds$o_price <- diamonds$price
 diamonds$o_carat <- diamonds$carat
 ```
 
-Simplify categories using TJ's code 
+Reduce categories for model simplicity.  The justification 
+for these is in the EDA section of our project document.
 
 ```{r}
 library(MASS) 
@@ -35,41 +51,30 @@ diamonds$clarity = factor(diamonds$clarity)
 diamonds$cut= factor(diamonds$cut)
 diamonds$color =factor(diamonds$color)
 
-#levels(diamonds$clarity)
-#levels(diamonds$cut)
-#levels(diamonds$color)
-
 #adjusting the data frame variables to the transformed versions
 diamonds$price = log(diamonds$price)
-diamonds$carat = log(diamonds$carat + .2)
+diamonds$carat = log(diamonds$carat + .1)
 
-###############################################
-#### NOTE: I added "K" to colorgroup3
-###############################################
 ##### setting new levels and reference levels
 levels(diamonds$color) <- list("colorgroup1" = c("D"),
                       "colorgroup2"   = c("E","F","G","H"),
                       "colorgroup3"   = c("I","J","K"))
 
 diamonds$color = relevel(diamonds$color, ref = "colorgroup3")
-contrasts(diamonds$color)
+#contrasts(diamonds$color)
 
-###############################################
-#### NOTE: I added "Excellent" to cutgroup2
-###############################################
 levels(diamonds$cut) <- list("cutgroup1" = c("Astor Ideal"),
                              "cutgroup2"   = c("Ideal", "Excellent"),
                              "cutgroup3"   = c("Good","Very Good"))
 
 diamonds$cut = relevel(diamonds$cut, ref = "cutgroup3")
-contrasts(diamonds$cut)
+#contrasts(diamonds$cut)
 
 levels(diamonds$clarity) <- list("claritygroup1" = c("FL","IF"),
                                  "claritygroup2"   = c("VS1","VVS1","VS2","VVS2"),
                                  "claritygroup3"   = c("SI1","SI2"))
 
 diamonds$clarity = relevel(diamonds$clarity, ref = "claritygroup3")
-contrasts(diamonds$clarity)
 
 ```
 
@@ -77,8 +82,7 @@ Set aside the external vendors' diamonds into dataframe "subExtra"
 Then remove them from our main "diamonds" dataframe
 They will not influence our model and can be used for testing
 
-After this code snippet, "diamonds" will contain the same data as the original
-(except it has the new column "vendor")
+After this code snippet, "diamonds" will contain the same data as the original (except it has the new column "vendor")
 
 ```{r}
 subCostco<-subset(diamonds,vendor=="Costco")
@@ -91,7 +95,6 @@ subDanielWilliams<-subset(diamonds,vendor=="DanielWilliams")
 subDanielWilliams$subcolor = "green"
 subDanielWilliams$subpch = 8
 subExtras <- rbind(subBlueNile, subCostco, subDanielWilliams)
-#subExtras$brand = 
 diamonds<-subset(diamonds,vendor=="Original")
 ```
 
@@ -125,22 +128,19 @@ summary(test_lm)
 
 ```
 
-An initial test of predictions
+Initial look to see if predictions based on original dataset are compatible with externally sourced diamonds.
 
 
 ```{r}
 
 pExtras <- data.frame(predict(test_lm, newdata = subExtras, interval = "prediction"))
 subExtras$predicted <- exp(pExtras$fit)
-#subExtras$log_range <- pExtras$upr - pExtras$lwr
-
-#subExtras$gap <- (pExtras$fit - subExtras$price) / subExtras$price
 
 subExtras
 
 ```
 
-Show conf intervals here
+Graph of prediction intervals compared to external data points
 
 ```{r}
 pred.int <- predict(test_lm, newdata = subExtras, interval = "prediction")
@@ -160,16 +160,16 @@ p + geom_line(aes(y = lwr), color = "red", linetype = "dashed")+
 ```
 
 
-
-
-
-Bar chart showing under/over counts
+Bar chart showing what percentages of external-sample data are under/over the prediction interval of our model.
 
 ```{r}
 subExtras$upr <- exp(pExtras$upr)
 subExtras$lwr <- exp(pExtras$lwr)
 
-
+# Define 5 categories for prediction accuracy:
+# --Below and above PI
+# --Top- and bottom- half within PI
+# --Within 5% of model-predicted mean price
 subExtras$PAccuracy[subExtras$o_price < subExtras$lwr] = "Below PI"
 subExtras$PAccuracy[subExtras$o_price >= subExtras$lwr] = "Low"
 subExtras$PAccuracy[subExtras$o_price > (subExtras$predicted * 0.95)] = "Accurate"
@@ -189,41 +189,4 @@ barplot(counts2, main="Diamond Prices compared to Predicted Price",
   legend = rownames(counts),
   args.legend = list(x = "topright", bty = "n", inset=c(-0.5, 0)))
 ```
-
-
-Attempt to plot PI's
-
-```{r}
-pred.int <- predict(test_lm, newdata = subExtras, interval = "prediction")
-
-ggdata <- cbind(subExtras,pred.int)
-library("ggplot2")
-
-p <- ggplot(ggdata, aes(carat, price)) +
-  geom_point(pch=subExtras$subpch, 
-             col=subExtras$subcolor) 
-p + geom_line(aes(y = lwr), color = "red", linetype = "dashed")+
-  geom_line(aes(y = upr), color = "red", linetype = "dashed") +
-  geom_line(aes(y = fit), color = "blue")
-#  stat_smooth(method = "loess")  # "gam" and "lm" are other options
-
-#NB I can't figure out how to make a legend :-(
-
-```
-
-'''
-PriceAccuracy <- function(actual,
-                          fitted,
-                          p_lower,
-                          p_upper) {
-  lowAccurate <- fitted * 0.95
-  highAccurate <- fitted * 1.05
-  rval = "Below PI"
-  if (actual > p_lower) { rval = "Low" }
-  if (actual > lowAccurate) { rval = "Accurate" }
-  if (actual > highAccurate) { rval = "High" }
-  if (actual > p_upper) { rval = "Above PI" }
-  cat(actual,fitted,p_lower,p_upper,rval,sep=" ")
-  rval
-}'''
 
